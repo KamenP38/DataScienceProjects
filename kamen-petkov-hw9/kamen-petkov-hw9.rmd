@@ -1,0 +1,166 @@
+---
+title: "CS 422"
+author: "Kamen Petkov, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+## Homework-9 Practicum problems
+
+### Import Libraries
+```{r}
+library(dplyr)
+library(psych)
+library(factoextra)
+library(dbscan)
+library(fpc)
+
+setwd("C:/Users/ACER/Desktop/Desktop/IIT_Stuff/CS 422/myHws/HW9")
+```
+
+
+### 2.1 (a)
+```{r}
+df <- read.csv("s1.csv")
+summary(df)
+df.scale <- scale(df)
+summary(df.scale)
+```
+#### Standardization is useful when all of the features have a Gaussian/Normal distribution. Moreover, after observing that the min and max values from the summary are different, it makes sense to standardize the data. We will bring down the features to a common scale without distorting the difference in the range of values.
+
+### 2.1 (b)
+```{r}
+# Plot the data
+plot(df.scale)
+```
+#### After plotting the scaled data, we can see 15 well-separated clusters and a small number of outliers around the clusters.
+
+### 2.1 (c)(i)
+```{r}
+# Number of clusters (k-means)
+fviz_nbclust(df.scale, kmeans, k.max = 25, method="wss")
+```
+
+### 2.1 (c)(ii)
+```{r}
+fviz_nbclust(df.scale, kmeans, k.max = 25, method="silhouette")
+```
+### 2.1 (c)(iii)
+#### The plots that we see after using the two methods (wss and silhouette) show us that the optimal number of clusters for k-means clustering is about 19 as afterward, there is little to no difference in the slope in both plots.
+
+
+
+### 2.1 (d)(i)
+```{r}
+kNNdistplot(df.scale, k = 19)
+```
+
+### 2.1 (d)(ii)
+#### K-means did not cluster the data in the most intuitive way. Most of the clusters are correct, however, some of them are out of place.
+
+### 2.1 (e)(i)
+#### I chose MinPts to be equal to 15. I first tried to follow the rule MinPts = 2 * number of dimension, however, the plot didn't look good (MinPts was 4 since we have 2 dimensions.). Hence, I doubled MinPts. I noticed a little bit better but a similar result. Finally, I almost doubled this result as well and I noticed that when MinPts is equal to 15, I get the results that I wanted. For the most part, the outliers stay out of the clusters.
+
+### 2.1 (e)(ii)
+```{r}
+# DBScan
+for( i in c(0.08, 0.09, 0.1, 0.11, 0.12)){
+  scan <- fpc::dbscan(df.scale, eps = i, MinPts = 15)
+  plot(scan, df.scale, main = as.character(i))}
+```
+
+#### After plotting k-distances, I noticed that the knee is somewhere around eps = 0.08 and 0.12, as for these results the graph shows us that there are 14-15 clusters, the value that we were expecting. 
+#### At minPts = 15, eps = 0.08, there are 15 clusters.
+#### At minPts = 15, eps = 0.09, there are 15 clusters.
+#### At minPts = 15, eps = 0.10, there are 15 clusters.
+#### At minPts = 15, eps = 0.11, there are 14 clusters.
+#### At minPts = 15, eps = 0.12, there are 14 clusters.
+
+### 2.2 (a)(i)
+```{r}
+df1 <- read.csv("countries.csv", row.names = 1)
+summary(df1)
+```
+
+### 2.2 (a)(ii)
+```{r}
+boxplot(df1$GDP)
+boxplot(df1$HIV)
+boxplot(df1$Lifeexp)
+boxplot(df1$Mil)
+boxplot(df1$Oilcons)
+boxplot(df1$Pop)
+boxplot(df1$Tel)
+boxplot(df1$Unempl)
+```
+#### PCA transforms datasets from high dimensions to low dimensions with a minimal loss of data. However, here we notice that if we consider the population of China and India (which is too big), it would affect the transformation (it's not going to apply for the general case). Hence, these two countries' populations are considered outliers.
+
+### 2.2 (b)(i)
+```{r}
+# PCA
+options(digits = 3)
+df1
+p <- prcomp(df1, scale = T)
+summary(p)
+```
+#### The summary shows that 4 of the components explain at least 90% of the variance (91.62%).
+
+
+### 2.2 (b)(ii)
+```{r}
+# Screeplot
+screeplot(p, type = "lines")
+```
+### 2.2 (b)(iii)
+#### Based on the screeplot I would use 5 components for the modeling because after the 5th component there isn't much of a change in the slope.
+
+### 2.2 (c)
+```{r}
+# PCA components
+p$rotation
+```
+### 2.2 (c)(i)
+#### In PC1 GDP, Life Expectancy, Oil consumption, and telephone lines are positively correlated, while the other components (HIV, Military Spending, Population, and Unemployment) are negatively correlated. 
+### 2.2 (c)(ii)
+#### In PC2 GDP, Life expectancy, Military Spending, Oil consumption, Population, Telephone lines are positively correlated, while HIV and Unemployment are negatively correlated.
+
+### 2.2 (d)
+```{r}
+# Draw a biplot
+p.ranked <- prcomp(df1, scale = T, rank. = 2)
+biplot(p, scale=0)
+```
+
+### 2.2 (d)(i)
+```{r}
+p.ranked$x
+```
+
+### 2.2 (d)(ii)
+```{r}
+mat.p <- matrix(p.ranked$x[c(1,14,9),], nrow = 3, ncol = 2)
+m.rot <- matrix(p$rotation, nrow = 8, ncol = 2)
+dot.prod <- mat.p %*% t(m.rot)
+
+rownames(dot.prod) <- c("Brazil", "UK", "Japan")
+colnames(dot.prod) <- c("GDP", "HIV", "Lifeexp", "Mil", "Oilcons", "Pop", "Tel", "Unempl")
+dot.prod
+scale(df1[c(1,14,9),])
+```
+#### The values of PC1 and PC2 for Brazil, UK, and Japan make sense as they match very well the scaled data from the csv file. We also notice slight errors but they are acceptable since PC1 and PC2 explain about 69% of the data.
+
+
+
+
+
+
+
+
+
+
+

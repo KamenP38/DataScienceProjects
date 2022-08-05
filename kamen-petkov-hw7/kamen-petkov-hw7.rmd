@@ -1,0 +1,298 @@
+---
+title: "CS 422"
+author: "Kamen Petkov, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+## Homework-7 Programming Problem: Feed Forward Neural Networks
+
+```{r}
+library(keras)
+library(dplyr)
+library(caret)
+
+rm(list=ls())
+
+# Set working directory as needed
+setwd("C:/Users/ACER/Desktop/Desktop/IIT_Stuff/CS 422/myHws/HW7")
+
+df <- read.csv("activity-small.csv")
+
+# Seed the PRNG
+set.seed(1122)
+df <- df[sample(nrow(df)), ] # Shuffle, as all of the data in the .csv file
+                             # is ordered by label!  This will cause problems
+                             # if we do not shuffle as the validation split
+                             # may not include observations of class 3 (the
+                             # class that occurs at the end).  The validation_
+                             # split parameter samples from the end of the
+                             # training set.
+
+# Scale the dataset.  Copy this block of code as is and use it; we will get
+# into the detail of why we scale.  We will scale our dataset so all of the
+# predictors have a mean of 0 and standard deviation of 1.  Scale test and
+# training splits independently!
+
+indx <- sample(1:nrow(df), 0.20*nrow(df))
+test.df  <- df[indx, ]
+train.df <- df[-indx, ]
+
+label.test <- test.df$label
+test.df$label <- NULL
+test.df <- as.data.frame(scale(test.df))
+test.df$label <- label.test
+rm(label.test)
+
+label.train <- train.df$label
+train.df$label <- NULL
+train.df <- as.data.frame(scale(train.df))
+train.df$label <- label.train
+rm(label.train)
+rm(indx)
+```
+
+### a) Batch gradient descent
+
+```{r}
+X_train <- select(train.df, -label)
+y_train <- to_categorical(train.df$label)
+
+X_test <- select(test.df, -label)
+y_test <- to_categorical(test.df$label)
+
+
+create_model1 <- function(batch.size) {
+  
+  model <- keras_model_sequential()
+  model %>% 
+    layer_dense(units = 12, activation = 'relu', input_shape = c(3)) %>%
+    layer_dense(units = 4, activation = 'softmax')
+    
+  summary(model)
+  
+  model %>% compile(
+    optimizer = 'adam',
+    loss = 'categorical_crossentropy',
+    metrics = c("accuracy")
+  )
+  
+  model %>% fit(
+    data.matrix(X_train), 
+    y_train,
+    epochs=100,
+    batch_size= batch.size,
+    verbose= 0
+  )
+  
+  return(model)
+}
+
+prediction <- function(model) {
+  model %>% evaluate(as.matrix(X_test), y_test)
+  
+  pred.prob <- predict(model, as.matrix(X_test))
+  pred.class <- apply(pred.prob, 1, function(x) which.max(x)-1)
+  conf.matrix <- confusionMatrix(as.factor(test.df$label), as.factor(pred.class))
+  
+  return(conf.matrix)
+}
+
+model <- create_model1(1)
+model %>% evaluate(as.matrix(X_test), y_test)
+pred.prob <- predict(model, as.matrix(X_test))
+pred.class <- apply(pred.prob, 1, function(x) which.max(x)-1)
+conf.matrix <- confusionMatrix(as.factor(test.df$label), as.factor(pred.class))
+```
+
+### Results a)
+```{r}
+{
+cat("  ","Overall accuracy: ", round(conf.matrix$overall[1]*100,2))
+cat("\n")
+cat("  ","Class 0: Sens. = ", round(conf.matrix$byClass[,1][1]*100,2)," Spec. = ", round(conf.matrix$byClass[,2][1]*100,2)," Bal.Acc. = ", round(conf.matrix$byClass[,11][1]*100,2))
+cat("\n")
+cat("  ","Class 1: Sens. = ", round(conf.matrix$byClass[,1][2]*100,2)," Spec. = ", round(conf.matrix$byClass[,2][2]*100,2)," Bal.Acc. = ", round(conf.matrix$byClass[,11][2]*100,2))
+cat("\n")
+cat("  ","Class 2: Sens. = ", round(conf.matrix$byClass[,1][3]*100,2)," Spec. = ", round(conf.matrix$byClass[,2][3]*100,2)," Bal.Acc. = ", round(conf.matrix$byClass[,11][3]*100,2))
+cat("\n")
+cat("  ","Class 3: Sens. = ", round(conf.matrix$byClass[,1][4]*100,2)," Spec. = ", round(conf.matrix$byClass[,2][4]*100,2)," Bal.Acc. = ", round(conf.matrix$byClass[,11][4]*100,2))
+cat("\n","\n")
+}
+```
+
+### b) Mini-Batch gradient descent
+
+```{r}
+times <- list()
+acc <- list()
+sens <- list()
+spec <- list()
+balan.acc <- list()
+n.batch <- 1 
+
+for (i in c(1, 32, 64, 128, 256)){
+  begin <- Sys.time()
+  
+  model <- NULL
+  model <- create_model1(i)
+  
+  end <- Sys.time()
+  times[n.batch] <- end-begin
+
+  model %>% evaluate(as.matrix(X_test), y_test)
+  pred.prob <- predict(model, as.matrix(X_test))
+  pred.class <- apply(pred.prob, 1, function(x) which.max(x)-1)
+  conf.matrix <- confusionMatrix(as.factor(test.df$label), as.factor(pred.class))
+  
+  acc[n.batch] <- conf.matrix$overall[1]
+  sens[[n.batch]] <- conf.matrix$byClass[,1]
+  spec[[n.batch]] <- conf.matrix$byClass[,2]
+  balan.acc[[n.batch]] <- conf.matrix$byClass[,11]
+  
+  n.batch <- n.batch + 1 
+}
+```
+### Results b)
+```{r}
+n.batch <- 1
+for (j in c(1,32,64,128,256)){
+  
+  cat("Batch size:", j)
+  cat("\n")
+  cat("  ","Time taken to train neural network: ", round(trunc(times[[n.batch]])*60 + (times[[n.batch]] - trunc(times[[n.batch]])) ,2), " (seconds)")
+  cat("\n")
+  cat("  ","Overall accuracy: ", round(acc[[n.batch]]*100,2))
+  cat("\n")
+  cat("  ","Class 0: Sens. = ", round(sens[[n.batch]][1]*100,2)," Spec. = ", round(spec[[n.batch]][1]*100,2)," Bal.Acc. = ", round(balan.acc[[n.batch]][1]*100,2))
+  cat("\n")
+  cat("  ","Class 1: Sens. = ", round(sens[[n.batch]][2]*100,2)," Spec. = ", round(spec[[n.batch]][2]*100,2)," Bal.Acc. = ", round(balan.acc[[n.batch]][2]*100,2))
+  cat("\n")
+  cat("  ","Class 2: Sens. = ", round(sens[[n.batch]][3]*100,2)," Spec. = ", round(spec[[n.batch]][3]*100,2)," Bal.Acc. = ", round(balan.acc[[n.batch]][3]*100,2))
+  cat("\n")
+  cat("  ","Class 3: Sens. = ", round(sens[[n.batch]][4]*100,2)," Spec. = ", round(spec[[n.batch]][4]*100,2)," Bal.Acc. = ", round(balan.acc[[n.batch]][4]*100,2))
+  cat("\n","\n")
+  n.batch <- n.batch + 1
+}
+```
+
+### (c) Analyze the output from the mini-batch gradient descent.
+#### (i) Why do you think that the time vary as you increase the batch size?
+#### When we change the batch size, we are basically telling the model how many steps to take. we would usually expect that as we increase the batch size (decrease the number of steps), time would decrease. However, in my case specifically, this did not happen. In fact, there is no trend that I can personally notice as in batch size 1, the time is 60.12 seconds. We would expect to go down in batch size 32, however, time increased to 120.78 seconds. Then as we continued increasing the batch size, we started noticing what we wanted in the first place - time began to decrease. Batch size 128 took 60.32 seconds and in the end, batch size 256 took only 1 second.
+
+#### (ii) Comment on the output from the mini-batch gradient descent. Does overall accuracy, balanced accuracy and per-class statistics remain the same? Change? If change, why?
+#### The measurements became worse as the batch size increased. It is easy to notice that the overall accuracy in the last became much worse than in the first batch (difference of 9).
+
+### d) Batch gradient descent with one more hidden layer
+```{r}
+create_model1 <- function(batch.size, activation.function) {
+  
+  model <- keras_model_sequential()
+  model %>% 
+    layer_dense(units = 5, activation = activation.function, input_shape = c(3)) %>%
+    layer_dense(units = 12, activation = activation.function) %>%
+    layer_dense(units = 4, activation = 'softmax')
+    
+  summary(model)
+  
+  model %>% compile(
+    optimizer = 'adam',
+    loss = 'categorical_crossentropy',
+    metrics = c("accuracy")
+  )
+  
+  model %>% fit(
+    data.matrix(X_train), 
+    y_train,
+    epochs=100,
+    batch_size= batch.size,
+    verbose= 0
+  )
+  
+  return(model)
+}
+
+prediction <- function(model) {
+  model %>% evaluate(as.matrix(X_test), y_test)
+  
+  pred.prob <- predict(model, as.matrix(X_test))
+  pred.class <- apply(pred.prob, 1, function(x) which.max(x)-1)
+  
+  return(confusionMatrix(as.factor(test.df$label), as.factor(pred.class)))
+}
+
+acc <- list()
+sens <- list()
+spec <- list()
+balan.acc <- list()
+n <- 1 
+
+for (i in c("relu", "sigmoid", "tanh")){
+  begin <- Sys.time()
+  
+  model <- NULL
+  model <- create_model1(1,i)
+  
+  end <- Sys.time()
+  times[n] <- end-begin
+
+  model %>% evaluate(as.matrix(X_test), y_test)
+  pred.prob <- predict(model, as.matrix(X_test))
+  pred.class <- apply(pred.prob, 1, function(x) which.max(x)-1)
+  conf.matrix <- confusionMatrix(as.factor(test.df$label), as.factor(pred.class))
+  
+  acc[n] <- conf.matrix$overall[1]
+  sens[[n]] <- conf.matrix$byClass[,1]
+  spec[[n]] <- conf.matrix$byClass[,2]
+  balan.acc[[n]] <- conf.matrix$byClass[,11]
+  
+  n <- n + 1 
+}
+```
+#### To build the neural network, the first hidden layer has 5 neurons, one for each input and two more as a bias neuron. For the second layer, I decided to almost triple (12 units) the number of neurons I had in the first layer. The output layer has to have 4 neurons since the number of possible labels is 4, and the activation function is softmax. To choose the activation function in the hidden layers, I have made a grid search by training the model with the 3 activation functions proposed in the exercise and the results are as follows:
+
+### Results
+```{r}
+n <- 1
+for (i in c("relu", "sigmoid", "tanh")){
+  
+  cat("Activation Function:", i)
+  cat("\n")
+  cat("  ","Overall accuracy: ", round(acc[[n]]*100,2))
+  cat("\n")
+  cat("  ","Class 0: Sens. = ", round(sens[[n]][1]*100,2)," Spec. = ", round(spec[[n]][1]*100,2)," Bal.Acc. = ", round(balan.acc[[n]][1]*100,2))
+  cat("\n")
+  cat("  ","Class 1: Sens. = ", round(sens[[n]][2]*100,2)," Spec. = ", round(spec[[n]][2]*100,2)," Bal.Acc. = ", round(balan.acc[[n]][2]*100,2))
+  cat("\n")
+  cat("  ","Class 2: Sens. = ", round(sens[[n]][3]*100,2)," Spec. = ", round(spec[[n]][3]*100,2)," Bal.Acc. = ", round(balan.acc[[n]][3]*100,2))
+  cat("\n")
+  cat("  ","Class 3: Sens. = ", round(sens[[n]][4]*100,2)," Spec. = ", round(spec[[n]][4]*100,2)," Bal.Acc. = ", round(balan.acc[[n]][4]*100,2))
+  cat("\n","\n")
+  n <- n + 1
+}
+```
+### (a). Comment on the changes you observed by adding a new hidden layer. 
+
+#### Comparing the results, we can see that in the first case it predicted quite well the class 0 and a little worse the other classes. After adding one more layer, there doesn't seem to be much of an improvement as the measurements reamin more or less the same (Overall accuracy = 80 in both cases). If there is an improvement it might be due to overfitting. The complexity increases and the model will be trained better.
+
+#### Activation Function: relu
+#### Batch-size: 1
+
+#### Neural Network with 1-hidden-layer
+####    Overall accuracy:  80
+####    Class 0: Sens. =  93.1   Spec. =  97.89  Bal.Acc. =  95.50
+####    Class 1: Sens. =  70.31  Spec. =  94.12  Bal.Acc. =  82.22 
+####    Class 2: Sens. =  74.51  Spec. =  97.32  Bal.Acc. =  85.91 
+####    Class 3: Sens. =  85.19  Spec. =  85.55  Bal.Acc. =  85.37
+
+#### Neural Network with 2-hidden-layer
+####   Overall accuracy:  80
+####   Class 0: Sens. =  96.23  Spec. =  95.92  Bal.Acc. =  96.07
+####   Class 1: Sens. =  72.88  Spec. =  92.91  Bal.Acc. =  82.89
+####   Class 2: Sens. =  70.18  Spec. =  98.60   Bal.Acc. =  84.39
+####   Class 3: Sens. =  83.87  Spec. =  86.98  Bal.Acc. =  85.43
+

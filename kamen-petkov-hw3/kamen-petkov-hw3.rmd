@@ -1,0 +1,36 @@
+---
+title: "CS 422 HW 2"
+author: "Kamen Petkov, Student, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+## Homework 3
+### Due Date: Thursday, Feb 24 2022 11:59:59 PM Chicago Time
+
+install.packages("rpart")
+install.packages("rpart.plot")
+
+```{r}
+library(datasets)
+library(rpart)
+library(rpart.plot)
+data(iris) 
+summary(iris) 
+colnames(iris)
+dtf <- iris
+
+?rpart.plot
+
+
+model <- rpart(Species ~ ., data = dtf, method = "class",
+               control=rpart.control(minsplit=2, minbucket=1))
+rpart.plot(model, extra=104, fallen.leaves=T, type=4, main="Iris Dataset Decision Tree")
+```

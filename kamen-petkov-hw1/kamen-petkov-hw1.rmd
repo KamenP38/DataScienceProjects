@@ -1,0 +1,145 @@
+---
+title: "CS 422 hw1"
+author: "Kamen Petkov, Student, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+
+install.packages("magrittr")
+install.packages("dplyr")
+install.packages("psych")
+
+
+## Homework 1
+
+### Part 1
+```{r}
+library(magrittr)
+library(dplyr)
+library(psych)
+
+setwd("C:/Users/ACER/Desktop/Desktop/IIT_Stuff/CS 422")
+data.df <- read.csv(file = "us-covid.csv", skip = 7)
+data.df
+```
+
+### Part 2
+```{r}
+data.df %>%
+  select(-"confirmed_deaths") -> data.df.nolast
+data.df.nolast
+```
+
+### Part 3A
+```{r}
+data.df %>%
+  select(-"confirmed_deaths") %>%
+    arrange(desc(total_cases)) -> arranged.total
+
+arranged.total %>%
+  top_n(6, total_cases)
+```
+
+
+
+### Part 3B
+```{r}
+data.df %>%
+  select(-"confirmed_deaths") %>%
+  arrange(desc(total_cases)) -> arranged.total
+
+arranged.total %>%
+  top_n(6, -total_cases)
+```
+
+### Part 4A
+```{r}
+arranged.total %>%
+  select(-(1:2))-> arranged.nums
+
+arranged.nums
+# iv] a] We should exclude the first two columns from the analysis
+# because we must only use numeric values
+```
+
+
+### Part 4B
+```{r}
+
+# iv] b] After using the function "cor" we can see that the highest correlation is between the first and last columns
+# This means that as the number of COVID cases increases, the number of death increases as well.
+
+res <- cor(arranged.nums)
+round(res, 2)
+
+arranged.nums %>% 
+  select(1, 6) -> highest.cor
+highest.cor
+
+pairs.panels(highest.cor)
+```
+
+
+### Part 4C
+```{r}
+
+# iv] c] After using the function "cor" we can see that the highest correlation is between the fourth and fifth columns
+# The number of cases for the last 7 days does not have any correlation with the case rate per 100k.
+
+arranged.nums %>% 
+  select(4, 5) -> lowest.cor
+lowest.cor
+
+pairs.panels(lowest.cor)
+```
+
+
+
+### Part 5A
+```{r}
+
+# v] a) Draw a plot.
+
+plot(arranged.nums$confirmed+arranged.nums$probable, arranged.nums$total_deaths,
+     xlab = "Number of confirmed and probable cases",
+     ylab = "Total deaths",
+     main = "Total Deaths vs. Number of Confirmed + Probable cases")
+```
+
+
+### Part 5B
+```{r}
+
+# v] b) The anomaly can be seen in the part of the graph where x is 0. As we can see, even though there 
+# aren't any cases, there seems to be many deaths.
+```
+
+
+### Part 5C
+```{r}
+
+# v] c) Print out the state name, total deaths, confirmed cases, probable cases and total cases of all such states that show
+# this anomaly.
+
+# state name, total deaths, confirmed cases, probable cases and total cases
+
+filtered.data.df <- data.df %>%
+  filter(confirmed == 0 & probable == 0 & total_deaths > 0)%>%
+  select(state, total_deaths, confirmed, probable, total_cases)
+filtered.data.df
+```
+
+
+
+
+

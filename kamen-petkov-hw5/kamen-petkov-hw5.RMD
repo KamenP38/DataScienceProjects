@@ -1,0 +1,111 @@
+---
+title: "CS 422"
+author: "Kamen Petkov, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+## Homework-5 Programming Problem
+
+### Part 2: Grid Search and Random Forest
+
+### Dataset preparation
+```{r}
+
+library(dplyr)
+library(psych)
+library(superml)
+library(caret)
+library(randomForest)
+
+#Import dataset
+dtf.train <- read.csv("adult-train.csv", sep=",")
+dtf.test <- read.csv("adult-test.csv", sep=",")
+#Now we will get rid of the rows with a "?" character in them
+which(dtf.train$workclass == '?') -> wclass.clean.nums
+dfRemain.train <- dtf.train[-wclass.clean.nums, ]
+which(dfRemain.train$occupation == '?') -> wclass.clean.nums
+dfRemain.train <- dfRemain.train[-wclass.clean.nums, ]
+which(dfRemain.train$native_country == '?') -> wclass.clean.nums
+dfRemain.train <- dfRemain.train[-wclass.clean.nums, ]
+dfRemain.train
+
+
+which(dtf.test$workclass == '?') -> wclass.clean.nums
+dfRemain.test <- dtf.test[-wclass.clean.nums, ]
+which(dfRemain.test$occupation == '?') -> wclass.clean.nums
+dfRemain.test <- dfRemain.test[-wclass.clean.nums, ]
+which(dfRemain.test$native_country == '?') -> wclass.clean.nums
+dfRemain.test <- dfRemain.test[-wclass.clean.nums, ]
+dfRemain.test
+
+# Show the data frame
+head(dfRemain.train)
+head(dfRemain.test)
+```
+
+### Create the model and predict using Grid Search
+```{r}
+dfRemain.train$income <- as.factor(dfRemain.train$income)
+mtry.initial <- trunc(sqrt(ncol(dfRemain.train)))
+
+mean.OOB <- c()
+list.CM <- list()
+list.models <- list()
+
+n <- 1
+
+for (ntree in c(250,500,750)){
+  for (mtry in c(mtry.initial, mtry.initial + 1, mtry.initial + 2)){
+    
+    model <- randomForest(income ~ ., data=dfRemain.train, ntree=ntree, mtry= mtry, na.action=na.exclude)
+    prediction <- predict(model, dfRemain.test, type ="class")
+    
+    OOB <- model$err.rate[,1]
+    CM <- confusionMatrix(prediction, as.factor(dfRemain.test$income))
+    
+    list.models[[n]] <- model
+    mean.OOB[n] <- mean(OOB[[n]])
+    list.CM[[n]] <- CM
+    n = n + 1
+  }
+}
+```
+### (a) Determine the best model by examining balanced accuracy, sensitivity, and specificity as shown in the confusion matrix from the held-out test dataset, and picking the model that shows the maximum balanced accuracy, sensitivity and specificity.
+```{r}
+for (i in 1:9){
+  cat(i,"- These are the results for the random forest with ", list.models[[i]]$ntree, " trees and ", list.models[[i]]$mtry, " attributes:", "\n", fill=T)
+  cat("Balanced accuracy= ", round(list.CM[[i]]$byClass["Balanced Accuracy"],3),"\n", fill=T)
+  cat("Sensitivity= ", round(list.CM[[i]]$byClass["Sensitivity"],3),"\n", fill=T)
+  cat("Specificity= ", round(list.CM[[i]]$byClass["Specificity"],3),"\n", fill=T)
+  cat("Accuracy= ", round(list.CM[[i]]$overall["Accuracy"],3),"\n", fill=T)
+}
+
+```
+
+
+#### Grid search resulted in the best model at ntree = 250 and mtry = 3 
+#### Balanced accuracy=  0.78 
+#### Sensitivity=  0.934 
+#### Specificity=  0.625 
+#### Accuracy=  0.858 
+
+### (b) Determine the best model by examining the lowest (minimum) OOB error rate.
+```{r}
+for (i in 1:9){
+  cat(i,"- This is the OOB mean for the random forest with ", list.models[[i]]$ntree, " trees and ", list.models[[i]]$mtry, " attributes:", "\n", fill=T)
+  cat("OOB Mean = ", round(mean.OOB[i],3),"\n", fill=T)
+
+}
+
+```
+#### Grid search resulted in the best model for OOB at ntree = 750 and mtry = 5 
+#### OOB = 0.169
+
+### (c) Is the best model as determined by (a) the same model as determined by (b). Justify your answer.
+#### No, the model is not the same. Theoretically, the best model in (b) is the one that fits best, for this reason it should be the best model in (a), but it is not. However, the model chosen in (b) and the best model chosen in (a) have similar measures on the confusion matrix. At the same time it's not more similar compared to the other models, hence, this argument is not really valid. The differences may be due to the tree's imbalance.

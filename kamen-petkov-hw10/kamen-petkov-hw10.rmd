@@ -1,0 +1,202 @@
+---
+title: "CS 422"
+author: "Kamen Petkov, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+### User Profile
+```{r}
+library(lsa)
+setwd("C:/Users/ACER/Desktop/Desktop/IIT_Stuff/CS 422/myHws/HW10")
+
+users <- read.csv("ml-latest-small/ratings.csv")
+movies <- read.csv("ml-latest-small/movies.csv")
+
+id.iit <- 20464521 %% 671
+
+user.information <- users[users$userId == id.iit,]
+movie.information <- movies[movies$movieId %in% user.information$movieId,]
+profile.user <- data.frame()
+
+genres <- c("Action", "Adventure", "Animation",
+            "Children", "Comedy", "Crime", "Documentary",
+            "Drama", "Fantasy", "Film-Noir", "Horror", 
+            "IMAX", "Musical", "Mystery", "Romance", 
+            "Sci-Fi", "Thriller", "War", "Western", 
+            "(no genres listed)")
+
+for (i in genres) {
+  profile.user[[i]] <- as.numeric()
+}
+
+for (g in row.names(movie.information)){
+  genres <- movie.information[g, c("genres")]
+  genres <- strsplit(genres, "\\|")
+  for (genre in genres){
+    profile.user[as.character(movie.information[g, c("movieId")]), as.character(genre)] = 1
+  }
+}
+
+userProfile <- colSums(profile.user[,], na.rm = TRUE)
+userProfile <- userProfile/nrow(movie.information)
+userProfile
+```
+
+### Movie Profile
+```{r}
+chosen.movies <- movies[c(255, 232, 531, 756, 1254, 3813, 6487, 3412, 3240, 7110),]
+movieProfiles <- data.frame()
+
+genres <- c("Action", "Adventure", "Animation",
+            "Children", "Comedy", "Crime", "Documentary",
+            "Drama", "Fantasy", "Film-Noir", "Horror", 
+            "IMAX", "Musical", "Mystery", "Romance", 
+            "Sci-Fi", "Thriller", "War", "Western", 
+            "(no genres listed)")
+
+for (i in genres){
+  movieProfiles[[i]] <- as.numeric()
+} 
+
+for (g in row.names(chosen.movies)){
+  genres <- chosen.movies[g, c("genres")]
+  genres <- strsplit(genres, "\\|")
+  for (genre in genres){
+    movieProfiles[as.character(chosen.movies[g, c("movieId")]), as.character(genre)] = 1
+  }
+}
+
+movieProfiles
+```
+
+### Recommendation
+```{r}
+movieProfiles[is.na(movieProfiles)] <- 0
+
+rec.movieId <- c()
+rec.movieName <- c()
+rec.similarity <- c()
+
+i <- 1
+for (movie in row.names(movieProfiles)){
+  m <- unlist(movieProfiles[movie,])
+  simil <- cosine(userProfile, m)
+  rec.movieId[i] <- movie
+  rec.movieName[i] <- movies[movies$movieId == movie, c("title")]
+  rec.similarity[i] <- simil
+  i <- i + 1
+}
+recommendation <- data.frame(MovieId = rec.movieId, MovieName = rec.movieName, Similarity = rec.similarity)
+recommendation <- recommendation[order(recommendation$Similarity, decreasing = TRUE),]
+cat("User ID", id.iit, "chose the following 10 movies:", row.names(movieProfiles), "\n")
+cat("Of these, the following 5 movies are recommended:", "\n")
+head(recommendation, 5)
+```
+
+
+
+
+
+### main()
+```{r}
+main = function(ID, random.movies){
+  
+  # USER PROFILE
+  users <- read.csv("ml-latest-small/ratings.csv")
+  movies <- read.csv("ml-latest-small/movies.csv")
+  
+  idUSER <- ID
+  
+  user.information <- users[users$userId == idUSER,]
+  movie.information <- movies[movies$movieId %in% user.information$movieId,]
+  profile.user <- data.frame()
+  
+  genres <- c("Action", "Adventure", "Animation",
+              "Children", "Comedy", "Crime", "Documentary",
+              "Drama", "Fantasy", "Film-Noir", "Horror", 
+              "IMAX", "Musical", "Mystery", "Romance", 
+              "Sci-Fi", "Thriller", "War", "Western", 
+              "(no genres listed)")
+  
+  for (i in genres) {
+    profile.user[[i]] <- as.numeric()
+  }
+  
+  for (g in row.names(movie.information)){
+    genres <- movie.information[g, c("genres")]
+    genres <- strsplit(genres, "\\|")
+    for (genre in genres){
+      profile.user[as.character(movie.information[g, c("movieId")]), as.character(genre)] = 1
+    }
+  }
+  
+  userProfile <- colSums(profile.user[,], na.rm = TRUE)
+  userProfile <- userProfile/nrow(movie.information)
+  userProfile
+  
+  
+  
+  
+  # MOVIE PROFILE
+  
+  chosen.movies <- movies[random.movies,]
+  movieProfiles <- data.frame()
+  
+  genres <- c("Action", "Adventure", "Animation",
+              "Children", "Comedy", "Crime", "Documentary",
+              "Drama", "Fantasy", "Film-Noir", "Horror", 
+              "IMAX", "Musical", "Mystery", "Romance", 
+              "Sci-Fi", "Thriller", "War", "Western", 
+              "(no genres listed)")
+  
+  for (i in genres){
+    movieProfiles[[i]] <- as.numeric()
+  } 
+  
+  for (g in row.names(chosen.movies)){
+    genres <- chosen.movies[g, c("genres")]
+    genres <- strsplit(genres, "\\|")
+    for (genre in genres){
+      movieProfiles[as.character(chosen.movies[g, c("movieId")]), as.character(genre)] = 1
+    }
+  }
+  
+  movieProfiles
+  
+  
+  
+  # RECOMMENDATION
+  movieProfiles[is.na(movieProfiles)] <- 0
+  
+  rec.movieId <- c()
+  rec.movieName <- c()
+  rec.similarity <- c()
+  
+  i <- 1
+  for (movie in row.names(movieProfiles)){
+    m <- unlist(movieProfiles[movie,])
+    simil <- cosine(userProfile, m)
+    rec.movieId[i] <- movie
+    rec.movieName[i] <- movies[movies$movieId == movie, c("title")]
+    rec.similarity[i] <- simil
+    i <- i + 1
+  }
+  recommendation <- data.frame(MovieId = rec.movieId, MovieName = rec.movieName, Similarity = rec.similarity)
+  recommendation <- recommendation[order(recommendation$Similarity, decreasing = TRUE),]
+  cat("User ID", idUSER, "chose the following 10 movies:", row.names(movieProfiles), "\n")
+  cat("Of these, the following 5 movies are recommended:", "\n")
+  print(output <- head(recommendation, 5))
+}
+
+# Get random values for ID and movies by removing the comment symbol
+ID <- sample(1:671, 1, replace = F) 
+random.movies <- c(sample(1:9125, 10, replace = F))
+main(ID, random.movies)
+
+```

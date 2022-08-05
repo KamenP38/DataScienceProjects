@@ -1,0 +1,56 @@
+---
+title: "CS 422"
+author: "Kamen Petkov, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+## Homework-6 Practicum problems
+
+### Part 2.1 Association Analysis
+
+```{r}
+library(dplyr)
+library(arules)
+library(arulesViz)
+```
+
+
+### (b) 
+```{r}
+files <- c(1, 5, 20, 75)
+for (file in files) {
+  print(paste0("tr-",file,"k"))
+  tr <- read.transactions(paste0("tr-",file,"k-canonical.csv"), sep=",")
+  
+  f_is <- apriori(tr, parameter=list(support=0.03, target="frequent itemsets"), control=list(verbose= FALSE))
+  rules <- apriori(tr, parameter = list(support=0.03, confidence = 0.90), control=list(verbose= FALSE))
+  
+  inspect(sort(f_is, decreasing = T, by="count"))
+  inspect(sort(rules, decreasing = T, by="confidence"))
+  
+  rm(f_is)
+  rm(rules)
+}
+```
+
+
+### (c) How does the number of transactions affect the results you observed? 
+
+#### First, I set the support to be equal to 0.03 and the confidence to be equal to 0.9 as I noticed interesting itemsets and rules. It is also noticeable that the number of itemsets for the different transaction files and the rules that come with them stay more or less the same.
+
+#### For frequent itemsets, the more transactions we have the less itemsets are generated. We can find 8 more itemsets comparing the 1k transaction file and the 75k file. The support of the most frequent itemset remains approximately constant in all transaction files.
+
+#### For the generated rules, the more transactions we have the less rules are generated, the ratio between the 1k file and the 75k file is almost 2:1. In terms of the support of the rules, they seem to be very similar in all of the files.
+
+
+### (d) (i) What is the most frequently purchased item or itemset? 
+#### The most frequently purchased item is Coffee Eclair (8193).
+
+### (d) (ii) What is the least frequently purchased item or itemset?
+#### The least frequently purchased itemset is Almond Twist and Hot Coffee (2319).

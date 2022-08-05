@@ -1,0 +1,240 @@
+---
+title: "CS 422 HW 2"
+author: "Kamen Petkov, Student, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+  
+  
+## Homework 2
+### Due Date: Saturday, Feb 19 2019 11:59:59 PM Chicago Time
+
+install.packages("ISLR")
+install.packages("Metrics")
+install.packages("caret")
+
+
+
+### Part A-i
+```{r}
+library(ISLR)
+library(Metrics)
+library(dplyr)
+library(caret)
+set.seed(1122)
+index <- sample(1:nrow(Auto), 0.95*dim(Auto)[1])
+train.df <- Auto[index,]
+test.df <- Auto[-index,]
+
+rnd <- function (x){
+  round(x, digits = 3)
+}
+
+
+dts<-Auto
+train.df %>%
+  select(-"name") -> dtsm
+test.df %>%
+  select(-"name") -> dtsm.test
+
+
+
+# use all predictors except name
+model <- lm(formula = mpg ~ ., data = dtsm)
+summary(model) -> sumry
+sumry
+# sumry <- apply(sumry, c(1,2), rnd) - I tried to convert it to max 3 significant digits
+# but it didn't work. I think it has to do something with the function rnd.
+
+# Using name as a predictor is not good because it's not a numerical value and it cannot 
+# really contribute for a numerical prediction. It's irrelevant.
+```
+### Part A-ii
+```{r}
+rsqr <- summary(model)$r.squared
+predictions <- model %>% predict(dtsm)
+rmse(dtsm$mpg, predictions) ->inf.rmse
+rse <- sqrt(deviance(model)/df.residual(model))
+cat("R-squared is: ", rsqr)
+cat("RMSE is: ", inf.rmse)
+cat("RSE is: ", rse)
+```
+
+
+### Part A-iii
+```{r}
+model.residual <- resid(model)
+model.residual
+plot(fitted(model), model.residual)
+abline(0, 0)
+# I add a Q-Q plot to show that the data is normally distributed
+qqnorm(model.residual)
+qqline(model.residual)
+```
+
+### Part A-iv
+```{r}
+hist(model.residual)
+# The histogram follows a Gaussian distribution 
+# During any measurement values will follow a normal 
+# distribution with an equal number of measurements above and below the mean value.
+```
+
+
+### Part B-i
+```{r}
+rPartMod <- train(mpg ~ ., data = dtsm, method="rpart")
+rpartImp <- varImp(rPartMod)
+print(rpartImp)
+
+# We can use p-value to determine the significance of the features.
+# However, I instead used the caret package to do this for me.
+# As we can see the most significant features are weight, displacement, and horsepower
+
+# Create new model
+dtsm %>%
+  select("mpg","weight", "displacement", "horsepower") -> dtsm.significant
+model.significant <- lm(mpg ~ ., data = dtsm.significant)
+```
+
+
+### Part B-ii
+```{r}
+summary(model.significant)
+rsqr2 <- summary(model.significant)$r.squared
+predictions2 <- model %>% predict(dtsm)
+rmse(predictions, dtsm$mpg) ->inf.rmse2
+rse2 <- sqrt(deviance(model.significant)/df.residual(model.significant))
+cat("R-squared is: ",rsqr2)
+cat("RMSE is: ", inf.rmse2)
+cat("RSE is: ", rse2)
+
+# R-squared is good (0.703). It shows us that the independent variable explains
+# the variation in the dependent variable
+# RMSE is not too high which is good for us. It's a good indication for the best fit.
+# RSE - considering the high degree of freedom, RSE is not too high
+# Overall, the best fit is good
+```
+
+
+
+
+### Part B-iii
+```{r}
+model.significant.residual <- resid(model.significant)
+model.significant.residual
+plot(fitted(model.significant), model.significant.residual)
+abline(0, 0)
+
+# I add a Q-Q plot to show that the data is normally distributed
+qqnorm(model.significant.residual)
+qqline(model.significant.residual) 
+```
+
+
+### Part B-iv
+```{r}
+hist(model.significant.residual)
+
+# The histogram has the shape of a bell which is a good sign for us. It follows a Gaussian distribution.
+# During any measurement values will follow a normal (or close to normal)
+# distribution with an equal number of measurements above and below the mean value.
+```
+
+
+### Part B-v
+```{r}
+# R-Squared, RMSE, RSE show more promising results in the first result. R-squared is closer to 1,
+# RMSE is the same, and RSE is lower. All of that is indication that the best fit would be better
+# compared to the second model.
+```
+
+### Part C
+```{r}
+# Using the predict() method, fit the test dataset to the model you created in (b) 
+model.significant %>% predict(dtsm.test) -> predicted
+predicted
+
+
+# Here we can see the confidence interval
+dtsm.test %>%
+  select("mpg","weight", "displacement", "horsepower") -> dtsm.significant.test
+model.significant.test <- lm(mpg ~ ., data = dtsm.significant.test)
+
+predict.lm(model.significant.test, interval = "confidence") -> conf
+conf
+actual.values <- dtsm.test$mpg
+actual.values
+newdata.frame <- data.frame(conf[, c(1)], actual.values,conf[, c(2,3)])
+names(newdata.frame)[1] <- 'Prediction'
+newdata.frame
+
+#pred.value <- conf[, c(1)]
+#pred.value
+#response.value <- predicted.df[, c(1)]
+#whole.data <- data.frame(pred.value, response.value)
+#conf["response"] <- response
+
+
+count.matches <- function(x,y,z){
+  if(x >= y && x <= z){
+    return(1)
+  }
+  else{
+    return(0)
+  }
+}
+
+
+mapply(count.matches, newdata.frame[ , c(2)], newdata.frame[ , c(3)], newdata.frame[ , c(4)]) -> sol
+sol
+newdata.frame["matches"] <- sol
+sum.count <- sum(newdata.frame[, 5])
+newdata.frame
+cat("Total observations correctly predicted: ", sum.count)
+```
+
+
+
+
+### Part E
+```{r}
+predict.lm(model.significant.test, interval = "predict") -> conf
+conf
+actual.values <- dtsm.test$mpg
+actual.values
+newdata.frame <- data.frame(conf[, c(1)], actual.values,conf[, c(2,3)])
+names(newdata.frame)[1] <- 'Prediction'
+newdata.frame
+
+
+mapply(count.matches, newdata.frame[ , c(2)], newdata.frame[ , c(3)], newdata.frame[ , c(4)]) -> sol
+sol
+newdata.frame["matches"] <- sol
+sum.count <- sum(newdata.frame[, 5])
+newdata.frame
+cat("Total observations correctly predicted: ", sum.count)
+```
+
+### Part F-i
+```{r}
+# The matches with prediciton interval (20) were more than the matches with confidence interval (12)
+```
+
+
+### Part F-ii
+```{r}
+# The prediction interval predicts in what range a future individual observation will fall, 
+# while a confidence interval shows the likely range of values associated 
+# with some statistical parameter of the data.
+# The prediction interval is always bigger than the confidence interval, however, it also 
+# has a bigger uncertainty. This is why we got more matches in e) than in d).
+```
+

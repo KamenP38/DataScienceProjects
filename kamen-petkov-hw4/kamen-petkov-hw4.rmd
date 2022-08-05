@@ -1,0 +1,269 @@
+---
+title: "CS 422 HW 4"
+author: "Kamen Petkov, Student, Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+  
+  
+  ## Homework 4
+  ### Due Date: Saturday, March 13 2022 11:59:59 PM Chicago Time
+
+### Part A
+```{r}
+library(rpart)
+library(caret)
+library(rpart.plot)
+library(ROCR)
+library(dplyr)
+
+
+
+options("digits"=2)
+dtf.train <- read.csv("adult-train.csv", header=T, sep=",", comment.char = '#')
+dtf.test <- read.csv("adult-test.csv", header = T, sep = ",", comment.char = '#')
+dtf.train
+
+## a) CLEAN DATA
+
+#Clean the train data
+#('workclass', 'education', 'marital_status', 'occupation', 'relationship', 'race', 'sex', 'native_country', 'income')
+sum(dtf.train$workclass  == "?")
+sum(dtf.train$education  == "?")
+sum(dtf.train$marital_status  == "?")
+sum(dtf.train$occupation  == "?")
+sum(dtf.train$relationship  == "?")
+sum(dtf.train$race  == "?")
+sum(dtf.train$sex  == "?")
+sum(dtf.train$native_country  == "?")
+sum(dtf.train$income  == "?")
+
+
+which(dtf.train$workclass == '?') -> wclass.clean.nums
+dfRemain.train <- dtf.train[-wclass.clean.nums, ]
+which(dfRemain.train$occupation == '?') -> wclass.clean.nums
+dfRemain.train <- dfRemain.train[-wclass.clean.nums, ]
+which(dfRemain.train$native_country == '?') -> wclass.clean.nums
+dfRemain.train <- dfRemain.train[-wclass.clean.nums, ]
+dfRemain.train
+
+
+#Clean the test data
+sum(dtf.test$workclass  == "?")
+sum(dtf.test$education  == "?")
+sum(dtf.test$marital_status  == "?")
+sum(dtf.test$occupation  == "?")
+sum(dtf.test$relationship  == "?")
+sum(dtf.test$race  == "?")
+sum(dtf.test$sex  == "?")
+sum(dtf.test$native_country  == "?")
+sum(dtf.test$income  == "?")
+
+
+which(dtf.test$workclass == '?') -> wclass.clean.nums
+dfRemain.test <- dtf.test[-wclass.clean.nums, ]
+which(dfRemain.test$occupation == '?') -> wclass.clean.nums
+dfRemain.test <- dfRemain.test[-wclass.clean.nums, ]
+which(dfRemain.test$native_country == '?') -> wclass.clean.nums
+dfRemain.test <- dfRemain.test[-wclass.clean.nums, ]
+dfRemain.test
+
+# DATA IS CLEAN NOW
+```
+
+
+
+
+### Part B-i)
+```{r}
+
+# b) BUILD A DECISION TREE MODEL
+model <- rpart(income ~ ., method="class", data=dfRemain.train)
+model
+
+# (i) NAME THE TOP 3 PREDICTORS IN THE MODEL
+printcp(model)
+# Here we see that the variables actually used in tree construction are:
+# capital_gain, education, relationship
+
+```
+
+
+
+### Part B-ii)
+```{r}
+print(model)
+# We see that the first split is done on 'relationship' 
+# The predicted class on the root node is <= 50k 
+# The distribution of classes is 0.7511 for <= 50k and 0.2489 for > 50k
+
+```
+
+
+### Part C-i)
+```{r}
+pred <- predict(model, dfRemain.test, type="class")
+pred
+
+total_pos <- sum(dfRemain.test[,15] == "<=50K")
+total_neg <- sum(dfRemain.test[,15] == ">50K")
+
+tp <- sum(dfRemain.test[,15] == "<=50K" & pred == "<=50K")
+tn <- sum(dfRemain.test[,15] == ">50K" & pred == ">50K")
+sensitivity <- tp/total_pos
+specificity <- tn/total_neg
+#BALANCED ACCURACY -> (SENSITIVITY + SPECIFICITY)/2
+bal.acc <- (sensitivity+specificity)/2
+bal.acc
+# Hence, the balanced accuracy of the model is 72.6%
+```
+
+
+### Part C-ii)
+```{r}
+bal.err <- 1 - bal.acc
+bal.err
+
+# Hence, the balanced error rate is 27.4 %
+```
+
+### Part C-iii)
+```{r}
+sensitivity <- tp/total_pos
+sensitivity
+specificity <- tn/total_neg
+specificity
+```
+
+
+### Part C-iv)
+```{r}
+# ROC curve
+pred.rocr <- predict(model, newdata=dfRemain.test, type="prob")[,2]
+f.pred <- prediction(pred.rocr, dfRemain.test$income)
+f.perf <- performance(f.pred, "tpr", "fpr")
+plot(f.perf, colorize=T, lwd=3)
+abline(0,1)
+auc <- performance(f.pred, measure = "auc")
+print(auc@y.values)
+```
+
+
+
+### Part d)
+```{r}
+model <- rpart(income ~ ., method="class", data=dfRemain.train)
+rpart.plot(model, extra=104, fallen.leaves=T, type=4, main="Decision Tree")
+printcp(model) # complexity table
+plotcp(model)
+
+# The tree would not benefit from a pruning because as we know the cp parameter is defined in rpart as the threshold value 
+# for the split such that any split that does not decrease the overall lack of 
+# fit by a factor of cp is not attempted.From the complexity table we see that
+# There's barely any split that decreases the overall lack of fit.
+
+# Despite that I did the pruning just to show that nothing really changes
+ptree <- prune(model, cp=model$cptable[which.min(model$cptable[,"xerror"]), "CP"])
+rpart.plot(ptree, extra=104, fallen.leaves = T, type=4)
+ptree.pred <- predict(ptree, dfRemain.test, type="class")
+```
+
+
+
+### Part e)-i)
+```{r}
+set.seed(1122)
+# (i) In the training dataset, how many observations are in the class "<=50K"? How many are in the class ">50K"?
+sum(dfRemain.train$income  == "<=50K")
+sum(dfRemain.train$income  == ">50K")
+```
+
+
+### Part e)-ii)
+```{r}
+# (ii)
+sum(dfRemain.train$income  == ">50K")
+dfRemain.train
+filter(dfRemain.train, income == "<= 50K") -> dfBelow
+filter(dfRemain.train, income == ">50K") -> dfAbove
+
+which(dfRemain.train$income == '<=50K') -> income.filter
+above <- dfRemain.train[-income.filter, ]
+above
+sum(above$income == ">50K")
+
+
+which(dfRemain.train$income == '>50K') -> income.filter
+below <- dfRemain.train[-income.filter, ]
+below
+sum(below$income == "<=50K")
+below[sample(which (below$income == "<=50K") ,7508), ] -> sampled.below
+new.training <- rbind(below, above)
+new.training
+```
+
+
+### Part e)-iii)
+```{r}
+#iii) Train a new model
+newmodel <- rpart(income ~ ., method="class", data=new.training)
+newmodel
+
+printcp(newmodel)
+print(newmodel)
+
+
+newpred <- predict(newmodel, dfRemain.test, type="class")
+newpred
+
+
+# i) What is the balanced accuracy of this model?
+total_pos <- sum(dfRemain.test[,15] == "<=50K")
+total_neg <- sum(dfRemain.test[,15] == ">50K")
+
+tp <- sum(dfRemain.test[,15] == "<=50K" & newpred == "<=50K")
+tn <- sum(dfRemain.test[,15] == ">50K" & newpred == ">50K")
+sensitivity <- tp/total_pos
+specificity <- tn/total_neg
+#BALANCED ACCURACY -> (SENSITIVITY + SPECIFICITY)/2
+bal.acc <- (sensitivity+specificity)/2
+bal.acc
+
+#(ii) What is the balanced error rate of this model? 
+bal.err <- 1 - bal.acc
+bal.err
+
+#(iii) What is the sensitivity? Specificity?
+sensitivity <- tp/total_pos
+specificity <- tn/total_neg
+sensitivity
+specificity
+#(iv) What is the AUC of the ROC curve. Plot the ROC curve.
+
+
+# ROC curve
+newpred.rocr <- predict(newmodel, newdata=dfRemain.test, type="prob")[,2]
+f.pred <- prediction(newpred.rocr, dfRemain.test$income)
+f.perf <- performance(f.pred, "tpr", "fpr")
+plot(f.perf, colorize=T, lwd=3)
+abline(0,1)
+auc <- performance(f.pred, measure = "auc")
+print(auc@y.values)
+```
+
+
+### Part f)
+```{r}
+# I didn't notice any differences. In fact they are identical. This means that for this example 
+# the two models worked equally well. All of the numbers (up to 2 decimal places) are exactly the same.
+```
+
+
+
